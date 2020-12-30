@@ -1,0 +1,127 @@
+plugins {
+    id 'java'
+    id 'eclipse'
+    id 'application'
+    id 'com.vaadin' version '0.8.0'
+    id "nebula.ospackage" version "8.4.1"
+}
+
+// Get Epoch from System
+def getCurrentTimestamp ()
+{
+  Date today = new Date ()
+  return today.getTime()
+}
+
+group = 'it.fox'
+version = '0.0.1'
+
+eclipse {
+    classpath {
+        file {
+            whenMerged {
+                def src = entries.find { it.path == 'src/main/java' }
+                src.output = "/$eclipse.project.name/classes/main-java"
+            }
+        }
+    }
+}
+
+defaultTasks("clean", "build")
+
+repositories {
+    jcenter()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+// example of how to configure the Gradle Vaadin Plugin
+vaadin {
+    pnpmEnable = true
+    productionMode = true
+}
+
+dependencies {
+    implementation enforcedPlatform('com.vaadin:vaadin-bom:14.3.4')
+
+    // Vaadin 14
+    implementation("com.vaadin:vaadin-core") {
+//         Webjars are only needed when running in Vaadin 13 compatibility mode
+        ["com.vaadin.webjar", "org.webjars.bowergithub.insites",
+         "org.webjars.bowergithub.polymer", "org.webjars.bowergithub.polymerelements",
+         "org.webjars.bowergithub.vaadin", "org.webjars.bowergithub.webcomponents"]
+                .forEach { group -> exclude(group: group) }
+    }
+    
+    implementation "org.slf4j:slf4j-simple:1.7.30"
+
+    implementation group: 'org.eclipse.jetty', name: 'jetty-server', version: '9.4.31.v20200723'
+    implementation group: 'org.eclipse.jetty', name: 'jetty-servlet', version: '9.4.31.v20200723'
+    implementation group: 'org.eclipse.jetty', name: 'jetty-webapp', version: '9.4.31.v20200723'
+    implementation group: 'org.eclipse.jetty', name: 'jetty-annotations', version: '9.4.31.v20200723'
+    implementation group: 'org.eclipse.jetty', name: 'jetty-plus', version: '9.4.31.v20200723'
+    implementation group: 'org.eclipse.jetty', name: 'jetty-continuation', version: '9.4.31.v20200723'
+    implementation group: 'org.eclipse.jetty.websocket', name: 'websocket-common', version: '9.4.31.v20200723'
+    implementation group: 'org.eclipse.jetty.websocket', name: 'websocket-server', version: '9.4.31.v20200723'
+    implementation group: 'org.eclipse.jetty.websocket', name: 'websocket-api', version: '9.4.31.v20200723'
+    implementation group: 'org.eclipse.jetty.websocket', name: 'javax-websocket-server-impl', version: '9.4.31.v20200723'
+    implementation group: 'javax.websocket', name: 'javax.websocket-client-api', version: '1.1'
+    implementation group: 'javax.servlet', name: 'javax.servlet-api', version: '4.0.1'
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.13.1'
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.13.1'
+
+    testImplementation group: 'junit', name: 'junit', version: '4.12'
+}
+
+mainClassName = "com.vaadin.starter.skeleton.ManualJetty"
+
+ospackage {
+        packageName = 'vaadintest'
+        epoch = getCurrentTimestamp ()
+        version = project.version
+        release = 00000
+        arch = X86_64
+        license = 'Proprietary Software'
+        packager = 'root'
+        description = 'Vaadin test app'
+        os = LINUX
+        type = BINARY
+        vendor 'Stefano Bossi'
+
+        postInstall file('rpm/postInstall.sh')
+
+        from('rpm/log4j2.xml') {
+            user 'root'
+            fileMode 0644
+            fileType CONFIG | NOREPLACE
+            into '/etc/vaadin'
+        }
+        from(jar.outputs.files) {
+            into '/usr/share/vaadin'
+        }
+        from(configurations.runtimeClasspath) {
+            // println configurations
+            into '/usr/share/vaadin'
+        }
+}
+
+jar {
+    manifest {
+        attributes ('Implementation-Title': 'Gradle Quickstart',
+                   'Implementation-Version': version,
+                   'Main-Class': "$mainClassName",
+                   'Class-Path': configurations.runtimeClasspath.collect { it.getName() }.join(' ')
+        )
+    }
+}
+
+// Note to deploy
+// To compile and pack the software in a rpm use:
+// gradle clean buildRpm  -Pvaadin.productionMode
+// Remember to change to production:
+// * in gradle.build -> productionMode = true
+// * in ControlJetty.java -> private static final boolean PRODUCTION_MODE = true;
+// * in DashBoard.java -> private static final boolean PRODUCTION = true; 
